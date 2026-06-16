@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>گراف پیش‌نیاز درسی - مهندسی کامپیوتر دانشگاه لرستان</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap');
+  :root {
+    --bg: #0a0e1a; --panel: #111827; --border: #1e2d45; --text: #e2e8f0; --text-dim: #64748b; --accent: #38bdf8;
+    --c-asli: #3b82f6; --c-asli-glow: rgba(59,130,246,0.35);
+    --c-takhasosi: #a855f7; --c-takhasosi-glow: rgba(168,85,247,0.35);
+    --c-paye: #10b981; --c-paye-glow: rgba(16,185,129,0.35);
+    --c-omumi: #f59e0b; --c-omumi-glow: rgba(245,158,11,0.35);
+    --c-ekhtiari: #ec4899; --c-ekhtiari-glow: rgba(236,72,153,0.35);
+    --edge-pre: #475569; --edge-co: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Vazirmatn', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; width: 100vw; }
+  #header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,14,26,0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 8px 16px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  }
+  #header h1 { font-size: 13px; font-weight: 700; color: var(--accent); }
+  #header p { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .legend { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-dim); }
+  .legend-dot { width: 9px; height: 9px; border-radius: 3px; }
+  .controls { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 4px 9px; border-radius: 6px; font-size: 10px; cursor: pointer;
+    font-family: 'Vazirmatn', sans-serif; transition: all 0.2s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0e1a; font-weight: 700; }
+  .btn.active { background: #1e3a5f; border-color: #38bdf8; color: #38bdf8; }
+  #canvas-wrapper { position: fixed; top: 58px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+  svg#graph { width: 100%; height: 100%; cursor: grab; }
+  svg#graph:active { cursor: grabbing; }
+  .term-label { font-family: 'Vazirmatn', sans-serif; font-size: 13px; font-weight: 700; fill: rgba(255,255,255,0.12); text-anchor: middle; }
+  .node rect { rx: 8; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); transition: filter 0.2s; }
+  .node:hover rect { filter: drop-shadow(0 4px 16px rgba(56,189,248,0.5)); }
+  .node text { font-family: 'Vazirmatn', sans-serif; font-size: 10.5px; fill: #fff; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+  .node text.code { font-size: 8.5px; fill: rgba(255,255,255,0.45); }
+  .edge { fill: none; stroke-width: 1.5; marker-end: url(#arrow-pre); }
+  .edge.pre { stroke: var(--edge-pre); }
+  .edge.co { stroke: var(--edge-co); stroke-dasharray: 4,3; marker-end: url(#arrow-co); }
+  .edge.path-longest { stroke: #ef4444 !important; stroke-width: 3 !important; marker-end: url(#arrow-longest) !important; }
+  .edge.path-shortest { stroke: #22c55e !important; stroke-width: 3 !important; marker-end: url(#arrow-shortest) !important; }
+  .node.highlight-longest rect { filter: drop-shadow(0 0 12px #ef4444) !important; stroke: #ef4444 !important; }
+  .node.highlight-shortest rect { filter: drop-shadow(0 0 12px #22c55e) !important; stroke: #22c55e !important; }
+  .tooltip {
+    position: fixed; background: #1e293b; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: 11.5px; max-width: 280px; pointer-events: none;
+    z-index: 999; opacity: 0; transition: opacity 0.15s; line-height: 1.75; direction: rtl;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .tt-title { font-weight: 700; font-size: 13px; color: var(--accent); margin-bottom: 6px; }
+  .tooltip .tt-row { color: var(--text-dim); }
+  .tooltip .tt-row span { color: var(--text); font-weight: 500; }
+  .badge-in { fill: #22c55e; font-size: 9px; font-weight: 700; }
+  .badge-out { fill: #f97316; font-size: 9px; font-weight: 700; }
+  .badge-rect-in { fill: rgba(34,197,94,0.18); stroke: #22c55e; stroke-width: 0.8; }
+  .badge-rect-out { fill: rgba(249,115,22,0.18); stroke: #f97316; stroke-width: 0.8; }
+  #side-panel {
+    position: fixed; bottom: 16px; right: 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; font-size: 10.5px; color: var(--text-dim); line-height: 1.9; z-index: 100;
+  }
+  #side-panel .section-title { color: var(--accent); font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+  .row { display: flex; align-items: center; gap: 6px; }
+  .line-sample { width: 28px; height: 2px; display: inline-block; vertical-align: middle; }
+  .dashed { background: repeating-linear-gradient(to right,var(--edge-co) 0,var(--edge-co) 4px,transparent 4px,transparent 7px); }
+  .solid { background: var(--edge-pre); }
+  .line-longest { background: #ef4444; height: 3px; }
+  .line-shortest { background: #22c55e; height: 3px; }
+  .dot-in { width: 10px; height: 10px; border-radius: 2px; background: rgba(34,197,94,0.3); border: 1px solid #22c55e; display:inline-block; }
+  .dot-out { width: 10px; height: 10px; border-radius: 2px; background: rgba(249,115,22,0.3); border: 1px solid #f97316; display:inline-block; }
+  #footer-credit {
+    position: fixed; bottom: 16px; left: 16px;
+    font-size: 10px; color: var(--text-dim); z-index: 100;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; line-height: 1.6;
+  }
+  #footer-credit span { color: var(--accent); font-weight: 600; }
+  #zoom-hint { position: fixed; bottom: 56px; left: 16px; font-size: 9.5px; color: var(--text-dim); z-index: 100; }
+  #path-info {
+    display: none;
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+    background: #0f172a; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 18px; font-size: 11px; z-index: 200; direction: rtl; max-width: 600px;
+    text-align: center;
+  }
+  #path-info .pi-title { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+  #path-info .pi-path { color: var(--text-dim); line-height: 2; }
+  #path-info .pi-path span { color: #fff; background: #1e293b; border-radius: 4px; padding: 2px 6px; margin: 0 2px; }
+</style>
+</head>
+<body>
+<div id="header">
+  <div>
+    <h1>گراف پیش‌نیاز درسی — مهندسی کامپیوتر دانشگاه لرستان</h1>
+    <p>ورودی ۹۸ به بعد &nbsp;|&nbsp; ویرایش مرداد ۱۴۰۰ &nbsp;|&nbsp; ۱۴۲ واحد</p>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-asli)"></div>اصلی</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-takhasosi)"></div>تخصصی</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-paye)"></div>پایه</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-omumi)"></div>عمومی</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-ekhtiari)"></div>اختیاری</div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btn-longest" onclick="togglePath('longest')">🔴 بلندترین مسیر</button>
+    <button class="btn" id="btn-shortest" onclick="togglePath('shortest')">🟢 کوتاه‌ترین مسیر</button>
+    <button class="btn" onclick="resetView()">بازنشانی نما</button>
+    <button class="btn primary" onclick="downloadSVG()">⬇ SVG</button>
+    <button class="btn primary" onclick="downloadPNG()">⬇ PNG</button>
+  </div>
+</div>
+
+<div id="path-info">
+  <div class="pi-title" id="pi-title"></div>
+  <div class="pi-path" id="pi-path"></div>
+</div>
+
+<div id="canvas-wrapper">
+  <svg id="graph" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow-pre" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#475569"/></marker>
+      <marker id="arrow-co" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+      <marker id="arrow-longest" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+      <marker id="arrow-shortest" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/></marker>
+    </defs>
+    <g id="zoom-layer">
+      <g id="bands-layer"></g>
+      <g id="edges-layer"></g>
+      <g id="nodes-layer"></g>
+      <g id="path-edges-layer"></g>
+    </g>
+  </svg>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<div id="side-panel">
+  <div class="section-title">راهنما</div>
+  <div class="row"><span class="line-sample solid"></span> پیش‌نیاز</div>
+  <div class="row"><span class="line-sample dashed"></span> هم‌نیاز</div>
+  <div class="row"><span class="line-sample line-longest"></span> بلندترین مسیر</div>
+  <div class="row"><span class="line-sample line-shortest"></span> کوتاه‌ترین مسیر</div>
+  <div style="margin-top:6px; border-top:1px solid var(--border); padding-top:6px;">
+  <div class="section-title">درجه گره‌ها</div>
+  <div class="row"><span class="dot-in"></span> عدد سبز = درجه ورودی</div>
+  <div class="row"><span class="dot-out"></span> عدد نارنجی = درجه خروجی</div>
+  </div>
+</div>
+
+<div id="footer-credit">
+  ساخته شده توسط: <span>محمد مهدی ناصرالاسلامی</span>
+</div>
+<div id="zoom-hint">اسکرول: زوم &nbsp;|&nbsp; درگ: جابجایی</div>
+
+<script>
+const terms = [
+  {id:1,label:'ترم اول',units:15},{id:2,label:'ترم دوم',units:18},
+  {id:3,label:'ترم سوم',units:19},{id:4,label:'ترم چهارم',units:18},
+  {id:5,label:'ترم پنجم',units:18},{id:6,label:'ترم ششم',units:19},
+  {id:7,label:'ترم هفتم',units:20},{id:8,label:'ترم هشتم',units:15},
+];
+
+const nodes = [
+  {id:'mabani',term:1,label:'مبانی کامپیوتر\nو برنامه‌نویسی',units:'3',type:'asli'},
+  {id:'kargah1',term:1,label:'کارگاه کامپیوتر\nو برنامه‌نویسی',units:'1ع',type:'asli'},
+  {id:'kargah_omumi',term:1,label:'کارگاه عمومی',units:'1ع',type:'paye'},
+  {id:'riazi1',term:1,label:'ریاضی عمومی (۱)',units:'3',type:'paye'},
+  {id:'fizik1',term:1,label:'فیزیک (۱)',units:'3',type:'paye'},
+  {id:'zaban_eng',term:1,label:'زبان انگلیسی',units:'3',type:'omumi'},
+  {id:'tarbiat1',term:1,label:'تربیت بدنی (۱)',units:'1ع',type:'omumi'},
+  {id:'goseste',term:2,label:'ریاضیات گسسته',units:'3',type:'asli'},
+  {id:'barname_pish',term:2,label:'برنامه‌نویسی\nپیشرفته',units:'3',type:'asli'},
+  {id:'kargah_pish',term:2,label:'کارگاه برنامه‌نویسی\nپیشرفته',units:'1ع',type:'asli'},
+  {id:'riazi2',term:2,label:'ریاضی عمومی (۲)',units:'3',type:'paye'},
+  {id:'fizik2',term:2,label:'فیزیک (۲)',units:'3',type:'paye'},
+  {id:'farsi',term:2,label:'زبان فارسی',units:'3',type:'omumi'},
+  {id:'quran',term:2,label:'تفسیر موضوعی\nقرآن',units:'2',type:'omumi'},
+  {id:'madar_man',term:3,label:'مدارهای منطقی',units:'3',type:'asli'},
+  {id:'lab_madar_man',term:3,label:'آزمایشگاه\nمدارهای منطقی',units:'1ع',type:'asli'},
+  {id:'madar_elec',term:3,label:'مدارهای الکتریکی\nو الکترونیکی',units:'3',type:'asli'},
+  {id:'lab_madar_elec',term:3,label:'آزمایشگاه مدارهای\nالکتریکی',units:'1ع',type:'asli'},
+  {id:'sakhteman',term:3,label:'ساختمان داده‌ها\nو الگوریتم‌ها',units:'3',type:'asli'},
+  {id:'moadelat',term:3,label:'معادلات\nدیفرانسیل',units:'3',type:'paye'},
+  {id:'lab_fizik2',term:3,label:'آزمایشگاه\nفیزیک (۲)',units:'1ع',type:'paye'},
+  {id:'graf',term:3,label:'نظریه گراف',units:'3',type:'ekhtiari'},
+  {id:'tarbiat2',term:3,label:'تربیت بدنی (۲)',units:'1ع',type:'omumi'},
+  {id:'memari',term:4,label:'معماری کامپیوتر',units:'3',type:'asli'},
+  {id:'lab_memari',term:4,label:'آزمایشگاه\nمعماری کامپیوتر',units:'1ع',type:'asli'},
+  {id:'amar',term:4,label:'آمار و احتمال\nمهندسی',units:'3',type:'paye'},
+  {id:'zaban_mash',term:4,label:'نظریه زبان‌ها\nو ماشین‌ها',units:'3',type:'asli'},
+  {id:'tarah_algo',term:4,label:'طراحی الگوریتم',units:'3',type:'takhasosi'},
+  {id:'jabr_khati',term:4,label:'جبر خطی\nکاربردی',units:'3',type:'asli'},
+  {id:'enghelab',term:4,label:'انقلاب اسلامی',units:'2',type:'omumi'},
+  {id:'rizmoard',term:5,label:'ریزپردازنده و\nزبان اسمبلی',units:'3',type:'asli'},
+  {id:'lab_riz',term:5,label:'آزمایشگاه\nریزپردازنده',units:'1ع',type:'asli'},
+  {id:'akhlaq',term:5,label:'اخلاق اسلامی',units:'2',type:'omumi'},
+  {id:'sys_amel',term:5,label:'سیستم‌های عامل',units:'3',type:'asli'},
+  {id:'lab_sys',term:5,label:'آزمایشگاه\nسیستم عامل',units:'1ع',type:'asli'},
+  {id:'zaban_tak',term:5,label:'زبان تخصصی',units:'2',type:'asli'},
+  {id:'payegah',term:5,label:'اصول طراحی\nپایگاه داده‌ها',units:'3',type:'takhasosi'},
+  {id:'hoosh',term:5,label:'مبانی و کاربردهای\nهوش مصنوعی',units:'3',type:'takhasosi'},
+  {id:'shabake',term:6,label:'شبکه‌های\nکامپیوتری',units:'3',type:'asli'},
+  {id:'lab_shabake',term:6,label:'آزمایشگاه\nشبکه‌های کامپیوتری',units:'1ع',type:'asli'},
+  {id:'mohandesi_narm1',term:6,label:'مهندسی\nنرم‌افزار (۱)',units:'3',type:'asli'},
+  {id:'mobile',term:6,label:'برنامه‌نویسی\nدستگاه‌های سیار',units:'3',type:'ekhtiari'},
+  {id:'compiler',term:6,label:'اصول طراحی\nکامپایلر',units:'3',type:'takhasosi'},
+  {id:'tarikh',term:6,label:'تاریخ تحلیلی\nصدر اسلام',units:'2',type:'omumi'},
+  {id:'ravesh',term:6,label:'روش پژوهش\nو ارائه',units:'2',type:'asli'},
+  {id:'khanevade',term:6,label:'دانش خانواده\nو جمعیت',units:'2',type:'omumi'},
+  {id:'hoosh_moh',term:7,label:'مبانی هوش\nمحاسباتی',units:'3',type:'takhasosi'},
+  {id:'baziyabi',term:7,label:'بازیابی اطلاعات',units:'3',type:'takhasosi'},
+  {id:'zaban_prog',term:7,label:'زبان‌های\nبرنامه‌نویسی',units:'3',type:'takhasosi'},
+  {id:'web',term:7,label:'برنامه‌نویسی وب',units:'3',type:'ekhtiari'},
+  {id:'mohandesi_narm2',term:7,label:'مهندسی\nنرم‌افزار (۲)',units:'3',type:'takhasosi'},
+  {id:'andishe1',term:7,label:'اندیشه اسلامی (۱)',units:'2',type:'omumi'},
+  {id:'prozheh',term:7,label:'پروژه',units:'3',type:'asli'},
+  {id:'data_mining',term:8,label:'داده‌کاوی',units:'3',type:'takhasosi'},
+  {id:'bioinf',term:8,label:'مقدمه‌ای بر\nبیوانفورماتیک',units:'3',type:'takhasosi'},
+  {id:'iot',term:8,label:'مبانی اینترنت\nاشیاء',units:'3',type:'ekhtiari'},
+  {id:'mabahes',term:8,label:'مباحث ویژه (۱)',units:'3',type:'ekhtiari'},
+  {id:'andishe2',term:8,label:'اندیشه اسلامی (۲)',units:'2',type:'omumi'},
+  {id:'karamoozi',term:8,label:'کارآموزی',units:'1ع',type:'asli'},
+];
+
+const prereqEdges = [
+  ['riazi1','goseste'],['mabani','goseste'],
+  ['mabani','barname_pish'],['mabani','kargah_pish'],
+  ['riazi1','riazi2'],['riazi1','fizik2'],
+  ['goseste','madar_man'],['goseste','lab_madar_man'],
+  ['goseste','sakhteman'],['barname_pish','sakhteman'],
+  ['fizik2','madar_elec'],['fizik2','lab_madar_elec'],['fizik2','lab_fizik2'],
+  ['riazi1','moadelat'],
+  ['madar_man','memari'],['madar_man','lab_memari'],
+  ['riazi2','amar'],
+  ['sakhteman','zaban_mash'],['sakhteman','tarah_algo'],['goseste','tarah_algo'],
+  ['riazi2','jabr_khati'],
+  ['memari','rizmoard'],['memari','lab_riz'],
+  ['memari','sys_amel'],['memari','lab_sys'],
+  ['zaban_eng','zaban_tak'],
+  ['sakhteman','payegah'],['sakhteman','hoosh'],
+  ['sys_amel','shabake'],['amar','shabake'],['memari','shabake'],
+  ['sys_amel','lab_shabake'],['amar','lab_shabake'],['memari','lab_shabake'],
+  ['barname_pish','mohandesi_narm1'],
+  ['barname_pish','mobile'],
+  ['sakhteman','compiler'],
+  ['zaban_tak','ravesh'],
+  ['tarah_algo','hoosh_moh'],['hoosh','hoosh_moh'],
+  ['sakhteman','baziyabi'],['amar','baziyabi'],
+  ['zaban_mash','zaban_prog'],
+  ['shabake','web'],
+  ['mohandesi_narm1','mohandesi_narm2'],
+  ['ravesh','prozheh'],
+  ['hoosh_moh','data_mining'],
+  ['hoosh_moh','bioinf'],
+  ['shabake','iot'],['rizmoard','iot'],
+  ['ravesh','karamoozi'],
+  ['moadelat','madar_elec'],
+];
+
+const coEdges = [
+  ['mabani','kargah1'],['kargah1','mabani'],
+  ['barname_pish','kargah_pish'],['kargah_pish','barname_pish'],
+  ['madar_man','lab_madar_man'],['lab_madar_man','madar_man'],
+  ['madar_elec','lab_madar_elec'],['lab_madar_elec','madar_elec'],
+  ['memari','lab_memari'],['lab_memari','memari'],
+  ['rizmoard','lab_riz'],['lab_riz','rizmoard'],
+  ['sys_amel','lab_sys'],['lab_sys','sys_amel'],
+  ['shabake','lab_shabake'],['lab_shabake','shabake'],
+  ['hoosh','jabr_khati'],
+];
+
+// ===== DEGREE COMPUTATION =====
+const inDeg = {}, outDeg = {};
+nodes.forEach(n => { inDeg[n.id] = 0; outDeg[n.id] = 0; });
+prereqEdges.forEach(([f,t]) => { outDeg[f]++; inDeg[t]++; });
+
+// ===== LONGEST PATH (DAG - topological longest path) =====
+// Build adjacency
+const adj = {};
+nodes.forEach(n => adj[n.id] = []);
+prereqEdges.forEach(([f,t]) => adj[f].push(t));
+
+// Topological sort
+function topoSort(nodeIds, adjMap) {
+  const visited = {}, order = [];
+  function dfs(n) { if(visited[n]) return; visited[n]=true; (adjMap[n]||[]).forEach(dfs); order.unshift(n); }
+  nodeIds.forEach(dfs);
+  return order;
+}
+
+const nodeIds = nodes.map(n => n.id);
+const topo = topoSort(nodeIds, adj);
+
+// Longest path DP
+const dist = {}, prev = {};
+nodeIds.forEach(n => { dist[n] = 0; prev[n] = null; });
+topo.forEach(u => {
+  (adj[u]||[]).forEach(v => {
+    if(dist[u]+1 > dist[v]) { dist[v]=dist[u]+1; prev[v]=u; }
+  });
+});
+const longestEnd = nodeIds.reduce((a,b) => dist[a]>=dist[b]?a:b);
+const longestPath = [];
+let cur = longestEnd;
+while(cur) { longestPath.unshift(cur); cur = prev[cur]; }
+
+// Shortest path (from any source to any sink - just shortest chain ≥ 2)
+// Find all sources (inDeg=0) and sinks (outDeg=0)
+const sources = nodeIds.filter(n => inDeg[n]===0 && outDeg[n]>0);
+const sinks   = nodeIds.filter(n => outDeg[n]===0 && inDeg[n]>0);
+
+// BFS from each source, find shortest path to any sink
+let shortestPath = null;
+sources.forEach(src => {
+  const queue = [[src]], visited = {[src]:true};
+  while(queue.length) {
+    const path = queue.shift();
+    const last = path[path.length-1];
+    if(sinks.includes(last)) {
+      if(!shortestPath || path.length < shortestPath.length) shortestPath = [...path];
+      break;
+    }
+    (adj[last]||[]).forEach(nxt => {
+      if(!visited[nxt]) { visited[nxt]=true; queue.push([...path,nxt]); }
+    });
+  }
+});
+
+// ===== LAYOUT =====
+const NODE_W=130, NODE_H=54, TERM_GAP=182, NODE_GAP_Y=70, MARGIN_X=80, MARGIN_Y=90;
+const termGroups={};
+nodes.forEach(n => { if(!termGroups[n.term]) termGroups[n.term]=[]; termGroups[n.term].push(n); });
+const maxPerTerm = Math.max(...Object.values(termGroups).map(g=>g.length));
+const SVG_W = terms.length*TERM_GAP + MARGIN_X*2;
+const SVG_H = maxPerTerm*NODE_GAP_Y + MARGIN_Y*2+40;
+const nodePos={};
+for(const [termId,group] of Object.entries(termGroups)){
+  const t=parseInt(termId);
+  const cx=MARGIN_X+(t-1)*TERM_GAP+NODE_W/2;
+  const totalH=group.length*NODE_GAP_Y;
+  const startY=(SVG_H-totalH)/2;
+  group.forEach((n,i)=>{
+    nodePos[n.id]={x:cx-NODE_W/2,y:startY+i*NODE_GAP_Y,cx,cy:startY+i*NODE_GAP_Y+NODE_H/2};
+  });
+}
+
+const typeColor={asli:'#3b82f6',takhasosi:'#a855f7',paye:'#10b981',omumi:'#f59e0b',ekhtiari:'#ec4899'};
+const typeGlow={asli:'rgba(59,130,246,0.25)',takhasosi:'rgba(168,85,247,0.25)',paye:'rgba(16,185,129,0.25)',omumi:'rgba(245,158,11,0.25)',ekhtiari:'rgba(236,72,153,0.25)'};
+const typeLabel={asli:'اصلی',takhasosi:'تخصصی',paye:'پایه',omumi:'عمومی',ekhtiari:'اختیاری'};
+
+// ===== RENDER =====
+const svg=document.getElementById('graph');
+const zoomLayer=document.getElementById('zoom-layer');
+const bandsLayer=document.getElementById('bands-layer');
+const edgesLayer=document.getElementById('edges-layer');
+const nodesLayer=document.getElementById('nodes-layer');
+const pathEdgesLayer=document.getElementById('path-edges-layer');
+const ns='http://www.w3.org/2000/svg';
+function el(tag){return document.createElementNS(ns,tag);}
+
+// Term bands
+terms.forEach((t,i)=>{
+  const x=MARGIN_X+i*TERM_GAP-10, w=NODE_W+20;
+  const r=el('rect');
+  r.setAttribute('x',x); r.setAttribute('y',10);
+  r.setAttribute('width',w); r.setAttribute('height',SVG_H-20);
+  r.setAttribute('rx',14);
+  r.setAttribute('fill',i%2===0?'rgba(255,255,255,0.018)':'rgba(255,255,255,0.009)');
+  bandsLayer.appendChild(r);
+  const lbl=el('text'); lbl.setAttribute('x',x+w/2); lbl.setAttribute('y',32);
+  lbl.setAttribute('class','term-label'); lbl.textContent=`${t.label} (${t.units}و)`;
+  bandsLayer.appendChild(lbl);
+});
+
+function cubicPath(x1,y1,x2,y2){
+  const dx=Math.abs(x2-x1)*0.45;
+  return `M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`;
+}
+
+// Draw prereq edges
+prereqEdges.forEach(([from,to])=>{
+  const a=nodePos[from],b=nodePos[to]; if(!a||!b) return;
+  const p=el('path');
+  p.setAttribute('d',cubicPath(a.cx+NODE_W/2,a.cy,b.cx-NODE_W/2,b.cy));
+  p.setAttribute('class','edge pre');
+  p.dataset.from=from; p.dataset.to=to;
+  edgesLayer.appendChild(p);
+});
+
+// Draw co-req edges
+const drawnCo=new Set();
+coEdges.forEach(([a,b])=>{
+  const key=[a,b].sort().join('--');
+  if(drawnCo.has(key)) return; drawnCo.add(key);
+  const pa=nodePos[a],pb=nodePos[b]; if(!pa||!pb) return;
+  const p=el('path');
+  if(pa.cx===pb.cx){
+    p.setAttribute('d',`M${pa.cx+NODE_W/2-8},${pa.cy} L${pb.cx+NODE_W/2-8},${pb.cy}`);
+  } else {
+    p.setAttribute('d',cubicPath(pa.cx,pa.cy+NODE_H/2-6,pb.cx,pb.cy-NODE_H/2+6));
+  }
+  p.setAttribute('class','edge co'); edgesLayer.appendChild(p);
+});
+
+// Node map
+const nodeMap={};
+nodes.forEach(n=>nodeMap[n.id]=n);
+const tooltip=document.getElementById('tooltip');
+const nodeEls={};
+
+nodes.forEach(n=>{
+  const pos=nodePos[n.id]; if(!pos) return;
+  const g=el('g'); g.setAttribute('class','node'); g.setAttribute('transform',`translate(${pos.x},${pos.y})`);
+  g.dataset.id=n.id;
+
+  // glow
+  const glow=el('rect'); glow.setAttribute('width',NODE_W); glow.setAttribute('height',NODE_H);
+  glow.setAttribute('rx',8); glow.setAttribute('fill',typeGlow[n.type]); g.appendChild(glow);
+  // main
+  const rect=el('rect'); rect.setAttribute('width',NODE_W); rect.setAttribute('height',NODE_H);
+  rect.setAttribute('rx',8); rect.setAttribute('fill','#111827');
+  rect.setAttribute('stroke',typeColor[n.type]); rect.setAttribute('stroke-width','1.5');
+  g.appendChild(rect);
+  // top bar
+  const bar=el('rect'); bar.setAttribute('width',NODE_W); bar.setAttribute('height',4);
+  bar.setAttribute('rx',8); bar.setAttribute('fill',typeColor[n.type]); g.appendChild(bar);
+
+  // Label
+  const lines=n.label.split('\n');
+  if(lines.length===1){
+    const t=el('text'); t.setAttribute('x',NODE_W/2); t.setAttribute('y',NODE_H/2+2); t.textContent=lines[0]; g.appendChild(t);
+  } else {
+    lines.forEach((line,i)=>{
+      const t=el('text'); t.setAttribute('x',NODE_W/2); t.setAttribute('y',NODE_H/2-6+i*14+2); t.textContent=line; g.appendChild(t);
+    });
+  }
+
+  // --- DEGREE BADGES ---
+  const indeg=inDeg[n.id], outdeg=outDeg[n.id];
+  // In-degree badge (top-right corner, green)
+  if(indeg>0){
+    const bw=18,bh=13;
+    const br=el('rect');
+    br.setAttribute('x',NODE_W-bw-1); br.setAttribute('y',4);
+    br.setAttribute('width',bw); br.setAttribute('height',bh);
+    br.setAttribute('rx',3); br.setAttribute('class','badge-rect-in');
+    g.appendChild(br);
+    const bt=el('text');
+    bt.setAttribute('x',NODE_W-bw/2-1); bt.setAttribute('y',11);
+    bt.setAttribute('class','badge-in'); bt.textContent=`↓${indeg}`;
+    g.appendChild(bt);
+  }
+  // Out-degree badge (top-left corner, orange)
+  if(outdeg>0){
+    const bw=18,bh=13;
+    const br=el('rect');
+    br.setAttribute('x',1); br.setAttribute('y',4);
+    br.setAttribute('width',bw); br.setAttribute('height',bh);
+    br.setAttribute('rx',3); br.setAttribute('class','badge-rect-out');
+    g.appendChild(br);
+    const bt=el('text');
+    bt.setAttribute('x',bw/2+1); bt.setAttribute('y',11);
+    bt.setAttribute('class','badge-out'); bt.textContent=`↑${outdeg}`;
+    g.appendChild(bt);
+  }
+
+  // Units & type at bottom
+  const badge=el('text'); badge.setAttribute('x',6); badge.setAttribute('y',NODE_H-5);
+  badge.setAttribute('class','code'); badge.setAttribute('text-anchor','start');
+  badge.textContent=n.units+' و'; g.appendChild(badge);
+  const tbadge=el('text'); tbadge.setAttribute('x',NODE_W-6); tbadge.setAttribute('y',NODE_H-5);
+  tbadge.setAttribute('class','code'); tbadge.setAttribute('text-anchor','end');
+  tbadge.setAttribute('fill',typeColor[n.type]); tbadge.textContent=typeLabel[n.type]; g.appendChild(tbadge);
+
+  // Hover tooltip
+  g.addEventListener('mouseenter',()=>{
+    const prereqs=prereqEdges.filter(([,to])=>to===n.id).map(([from])=>nodeMap[from]?.label.replace('\n','‌')||from);
+    const cos=[...drawnCo].filter(k=>k.includes(n.id)).map(k=>{
+      const other=k.split('--').find(x=>x!==n.id);
+      return nodeMap[other]?.label.replace('\n','‌')||other;
+    });
+    const successors=prereqEdges.filter(([from])=>from===n.id).map(([,to])=>nodeMap[to]?.label.replace('\n','‌')||to);
+    tooltip.innerHTML=`
+      <div class="tt-title">${n.label.replace('\n','<br>')}</div>
+      <div class="tt-row">ترم: <span>ترم ${n.term}</span></div>
+      <div class="tt-row">واحد: <span>${n.units}</span></div>
+      <div class="tt-row">نوع: <span>${typeLabel[n.type]}</span></div>
+      <div class="tt-row">درجه ورودی: <span style="color:#22c55e">${inDeg[n.id]}</span></div>
+      <div class="tt-row">درجه خروجی: <span style="color:#f97316">${outDeg[n.id]}</span></div>
+      ${prereqs.length?`<div class="tt-row">پیش‌نیاز: <span>${prereqs.join('، ')}</span></div>`:''}
+      ${cos.length?`<div class="tt-row">هم‌نیاز: <span>${cos.join('، ')}</span></div>`:''}
+      ${successors.length?`<div class="tt-row">پیش‌نیاز برای: <span>${successors.join('، ')}</span></div>`:''}
+    `;
+    tooltip.classList.add('show');
+  });
+  g.addEventListener('mousemove',e=>{
+    tooltip.style.left=(e.clientX+14)+'px'; tooltip.style.top=(e.clientY-10)+'px';
+  });
+  g.addEventListener('mouseleave',()=>tooltip.classList.remove('show'));
+
+  nodesLayer.appendChild(g);
+  nodeEls[n.id]=g;
+});
+
+// ===== PATH HIGHLIGHTING =====
+let activeMode=null;
+
+function clearPaths(){
+  pathEdgesLayer.innerHTML='';
+  document.querySelectorAll('.node.highlight-longest,.node.highlight-shortest').forEach(g=>{
+    g.classList.remove('highlight-longest','highlight-shortest');
+  });
+  document.getElementById('path-info').style.display='none';
+}
+
+function drawPathEdges(path, cls, color){
+  for(let i=0;i<path.length-1;i++){
+    const a=nodePos[path[i]], b=nodePos[path[i+1]]; if(!a||!b) continue;
+    const p=el('path');
+    p.setAttribute('d',cubicPath(a.cx+NODE_W/2,a.cy,b.cx-NODE_W/2,b.cy));
+    p.setAttribute('class',`edge ${cls}`);
+    pathEdgesLayer.appendChild(p);
+  }
+  path.forEach(nid=>{
+    if(nodeEls[nid]) nodeEls[nid].classList.add(cls==='path-longest'?'highlight-longest':'highlight-shortest');
+  });
+}
+
+function showPathInfo(path, title, color){
+  const pi=document.getElementById('path-info');
+  const names=path.map(id=>nodeMap[id]?.label.replace('\n',' ')||id);
+  document.getElementById('pi-title').style.color=color;
+  document.getElementById('pi-title').textContent=`${title} — ${path.length} درس`;
+  document.getElementById('pi-path').innerHTML=names.map(n=>`<span>${n}</span>`).join(' ← ');
+  pi.style.display='block';
+}
+
+function togglePath(mode){
+  if(activeMode===mode){ clearPaths(); activeMode=null; document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active')); return; }
+  clearPaths(); activeMode=mode;
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+  if(mode==='longest'){
+    document.getElementById('btn-longest').classList.add('active');
+    drawPathEdges(longestPath,'path-longest','#ef4444');
+    showPathInfo(longestPath,'بلندترین مسیر پیش‌نیازی','#ef4444');
+  } else {
+    document.getElementById('btn-shortest').classList.add('active');
+    if(shortestPath){ drawPathEdges(shortestPath,'path-shortest','#22c55e'); showPathInfo(shortestPath,'کوتاه‌ترین مسیر پیش‌نیازی','#22c55e'); }
+  }
+}
+
+// ===== PAN & ZOOM =====
+let scale=0.7,tx=30,ty=20,isPanning=false,startX,startY,startTX,startTY;
+function applyTransform(){ zoomLayer.setAttribute('transform',`translate(${tx},${ty}) scale(${scale})`); }
+function resetView(){ scale=0.7;tx=30;ty=20; applyTransform(); }
+svg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const d=e.deltaY>0?0.9:1.1;
+  tx=mx-(mx-tx)*d; ty=my-(my-ty)*d; scale=Math.min(3,Math.max(0.15,scale*d));
+  applyTransform();
+},{passive:false});
+svg.addEventListener('mousedown',e=>{isPanning=true;startX=e.clientX;startY=e.clientY;startTX=tx;startTY=ty;});
+window.addEventListener('mousemove',e=>{ if(!isPanning) return; tx=startTX+e.clientX-startX; ty=startTY+e.clientY-startY; applyTransform(); });
+window.addEventListener('mouseup',()=>isPanning=false);
+applyTransform();
+
+// ===== DOWNLOAD =====
+function buildFullSVG(){
+  const clone=svg.cloneNode(true);
+  clone.setAttribute('xmlns',ns); clone.setAttribute('viewBox',`0 0 ${SVG_W} ${SVG_H}`);
+  clone.setAttribute('width',SVG_W); clone.setAttribute('height',SVG_H);
+  const zl=clone.querySelector('#zoom-layer'); if(zl) zl.removeAttribute('transform');
+  const style=document.createElementNS(ns,'style');
+  style.textContent=`
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
+    text{font-family:'Vazirmatn',sans-serif;font-size:10.5px;fill:#fff;text-anchor:middle;dominant-baseline:middle;}
+    text.code{font-size:8.5px;fill:rgba(255,255,255,0.45);}
+    text.term-label{font-size:13px;font-weight:700;fill:rgba(255,255,255,0.25);}
+    text.badge-in{font-size:9px;font-weight:700;fill:#22c55e;}
+    text.badge-out{font-size:9px;font-weight:700;fill:#f97316;}
+    .badge-rect-in{fill:rgba(34,197,94,0.18);stroke:#22c55e;stroke-width:0.8;}
+    .badge-rect-out{fill:rgba(249,115,22,0.18);stroke:#f97316;stroke-width:0.8;}
+    .edge{fill:none;stroke-width:1.5;}
+    .edge.pre{stroke:#475569;}
+    .edge.co{stroke:#f59e0b;stroke-dasharray:4,3;}
+    .edge.path-longest{stroke:#ef4444;stroke-width:3;}
+    .edge.path-shortest{stroke:#22c55e;stroke-width:3;}
+  `;
+  clone.insertBefore(style,clone.firstChild);
+  const bg=document.createElementNS(ns,'rect');
+  bg.setAttribute('width',SVG_W); bg.setAttribute('height',SVG_H); bg.setAttribute('fill','#0a0e1a');
+  clone.insertBefore(bg,clone.firstChild);
+  return new XMLSerializer().serializeToString(clone);
+}
+function downloadSVG(){
+  const blob=new Blob([buildFullSVG()],{type:'image/svg+xml'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ce_curriculum_graph.svg'; a.click();
+}
+function downloadPNG(){
+  const svgStr=buildFullSVG();
+  const blob=new Blob([svgStr],{type:'image/svg+xml'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas'); c.width=SVG_W*2; c.height=SVG_H*2;
+    const ctx=c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img,0,0);
+    URL.revokeObjectURL(url);
+    c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ce_curriculum_graph.png';a.click();},'image/png');
+  };
+  img.src=url;
+}
+</script>
+</body>
+</html>
